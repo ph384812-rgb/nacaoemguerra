@@ -1,0 +1,460 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#cfe6f5">
+<title>Guerra dos Países</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@700;800&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --mar:#cfe6f5; --terra:#f3efe4; --borda:#ffffff;
+  --panel:rgba(255,255,255,.95); --line:#c5d2df; --fg:#14202e; --mut:#566579;
+  --acc:#d97706; --acc-fg:#ffffff; --red:#d62f23;
+  --display:"Big Shoulders Display","Arial Narrow",Impact,sans-serif;
+  --body:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
+}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0;background:var(--mar);color:var(--fg);font-family:var(--body);font-size:14px;overflow:hidden}
+#mapa{position:fixed;inset:0;touch-action:none}
+#mapa svg{display:block;width:100%;height:100%;cursor:grab}
+#mapa svg:active{cursor:grabbing}
+.pais{stroke:var(--borda);stroke-width:.7;vector-effect:non-scaling-stroke;fill:var(--terra);cursor:pointer;transition:fill .3s}
+.pais:hover{filter:brightness(.93)}
+.pais.guerra{stroke:var(--red);stroke-width:2.2}
+.pais.sel{stroke:#14202e;stroke-width:2.6}
+.rot{font-family:var(--body);font-weight:600;text-anchor:middle;fill:#14202e;paint-order:stroke;stroke:#ffffffd9;stroke-width:3px;stroke-linejoin:round;pointer-events:none}
+.arco{fill:none;stroke:var(--red);stroke-width:3;stroke-dasharray:9 6;vector-effect:non-scaling-stroke;animation:fluxo 1s linear infinite;pointer-events:none}
+.ponto{fill:var(--red);stroke:#fff;stroke-width:2;vector-effect:non-scaling-stroke;pointer-events:none}
+@keyframes fluxo{to{stroke-dashoffset:-15}}
+@media (prefers-reduced-motion:reduce){.arco{animation:none}.pais{transition:none}}
+
+.topo{position:fixed;left:0;right:0;top:0;z-index:5;display:flex;justify-content:space-between;align-items:flex-start;gap:12px;
+  padding:max(12px,env(safe-area-inset-top)) max(14px,env(safe-area-inset-right)) 14px max(14px,env(safe-area-inset-left));
+  background:linear-gradient(#cfe6f5f2,#cfe6f500);pointer-events:none}
+.topo>*{pointer-events:auto}
+h1{font-family:var(--display);font-size:clamp(28px,6vw,40px);text-transform:uppercase;letter-spacing:.02em;margin:0;line-height:1}
+.stats{font-family:var(--mono);font-size:12px;color:var(--mut);margin-top:4px;display:flex;gap:14px;flex-wrap:wrap}
+.stats b{color:var(--fg);font-weight:500}
+.leg{display:flex;gap:12px;flex-wrap:wrap;margin-top:6px;font-size:12px;color:var(--mut)}
+.leg span{display:flex;align-items:center;gap:5px}
+.leg i{width:12px;height:12px;display:block;border:1px solid #0003}
+.demo{background:var(--acc);color:var(--acc-fg);font-family:var(--mono);font-size:11px;padding:3px 8px;letter-spacing:.08em;text-transform:uppercase;align-self:flex-start}
+
+.zoom{position:fixed;z-index:5;left:max(14px,env(safe-area-inset-left));display:flex;flex-direction:column;gap:6px}
+.zoom button{width:40px;height:40px;font:600 20px var(--body);border:1px solid var(--line);background:var(--panel);color:var(--fg);cursor:pointer;border-radius:0}
+.zoom button:focus-visible{outline:2px solid var(--acc)}
+
+.painel{position:fixed;z-index:6;background:var(--panel);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);border:1px solid var(--line);display:flex;flex-direction:column;min-height:0}
+@media (min-width:820px){
+  .painel{top:92px;right:max(14px,env(safe-area-inset-right));bottom:max(14px,env(safe-area-inset-bottom));width:380px}
+  .alca{display:none}
+  .zoom{bottom:max(18px,env(safe-area-inset-bottom))}
+}
+@media (max-width:819px){
+  .painel{left:0;right:0;bottom:0;height:46vh;border-width:1px 0 0;padding-bottom:env(safe-area-inset-bottom)}
+  .painel.baixo{height:92px}
+  .zoom{top:96px}
+}
+.alca{all:unset;box-sizing:border-box;display:flex;justify-content:center;padding:8px;cursor:pointer;width:100%}
+.alca i{width:44px;height:4px;background:var(--line);display:block}
+.abas{display:flex;border-bottom:1px solid var(--line)}
+.abas button{all:unset;box-sizing:border-box;flex:1;text-align:center;padding:11px 4px;font-family:var(--mono);font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--mut);cursor:pointer;border-bottom:2px solid transparent}
+.abas button[aria-selected="true"]{color:var(--acc);border-bottom-color:var(--acc)}
+.abas button:focus-visible,.alca:focus-visible,.item:focus-visible,.fechar:focus-visible{outline:2px solid var(--acc);outline-offset:-2px}
+.corpo{flex:1;overflow:auto;padding:12px 14px 18px;display:flex;flex-direction:column;gap:10px;min-height:0}
+h2{font-family:var(--display);font-size:25px;text-transform:uppercase;margin:0;line-height:1.05}
+.mut{color:var(--mut)}.mono{font-family:var(--mono);font-size:12px}
+p{margin:0}
+.item{all:unset;box-sizing:border-box;display:grid;grid-template-columns:14px minmax(0,1fr) auto;gap:2px 10px;align-items:center;padding:9px 10px;border:1px solid var(--line);background:#fff;cursor:pointer;width:100%}
+.item:hover{background:#f4f8fc}
+.item .dot{width:14px;height:14px;border-radius:50%;grid-row:1/3;border:1px solid #0003}
+.item .n{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.item .v{font-family:var(--mono);font-size:12px;text-align:right}
+.item .s{font-family:var(--mono);font-size:11px;color:var(--mut);grid-column:2/4}
+.guerra-card{border:1px solid var(--red);padding:10px 12px;display:flex;flex-direction:column;gap:6px;background:#d62f2310}
+.guerra-card .t{font-family:var(--display);font-size:23px;text-transform:uppercase;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.guerra-card .x{color:var(--red)}
+.barra{height:9px;background:#0000001a;display:flex}
+.barra i{display:block;height:100%}
+.lider{border:1px solid var(--line);border-top:4px solid var(--acc);padding:12px;display:flex;flex-direction:column;gap:2px;background:#fff}
+.lider .q{font-family:var(--display);font-size:34px;font-weight:800;line-height:1;overflow-wrap:anywhere}
+.pat{display:grid;grid-template-columns:92px minmax(0,1fr);gap:6px;font-size:13px;padding:6px 0;border-top:1px solid var(--line)}
+.pat .p{font-weight:600}
+.pat .p small{display:block;font-family:var(--mono);font-weight:400;font-size:11px;color:var(--mut)}
+.chips{display:flex;flex-wrap:wrap;gap:5px;min-width:0}
+.chip{font-family:var(--mono);font-size:12px;padding:2px 7px;border:1px solid var(--line);background:#fff;overflow-wrap:anywhere}
+.campo{display:flex;gap:8px}
+input{font:inherit;color:var(--fg);background:#fff;border:1px solid var(--line);padding:10px 12px;min-width:0;flex:1;border-radius:0}
+input:focus-visible{outline:2px solid var(--acc);outline-offset:1px}
+.btn{font:inherit;font-weight:600;padding:10px 14px;border:0;background:var(--acc);color:var(--acc-fg);cursor:pointer;border-radius:0}
+.fechar{all:unset;box-sizing:border-box;cursor:pointer;color:var(--acc);font-weight:600;font-size:13px;text-decoration:underline;align-self:flex-start}
+.como{padding:10px 12px;background:#fff7e6;border:1px solid #f1d49b;font-size:13px}
+#tip{position:fixed;z-index:9;pointer-events:none;display:none;font-size:12px;line-height:1.4;padding:6px 9px;background:#fff;border:1px solid var(--line);box-shadow:0 2px 8px #0002;max-width:220px}
+#tip b{font-family:var(--display);font-size:19px;text-transform:uppercase;display:block;line-height:1.1}
+.carregando{position:fixed;inset:0;z-index:20;display:grid;place-items:center;background:var(--mar);font-family:var(--mono);color:var(--mut);transition:opacity .4s}
+.carregando.fim{opacity:0;pointer-events:none}
+</style>
+</head>
+<body>
+<div id="mapa" aria-label="Mapa-múndi com os países em guerra"></div>
+<div id="tip"></div>
+<div class="carregando" id="carregando">montando o mapa…</div>
+
+<header class="topo">
+  <div>
+    <h1>Guerra dos Países</h1>
+    <div class="stats" id="stats" aria-live="polite"></div>
+    <div class="leg" aria-hidden="true">
+      <span><i style="background:#f3efe4"></i>sem líder</span>
+      <span><i style="background:#7fc79a"></i>com líder</span>
+      <span><i style="background:#fff;border:2px solid #d62f23"></i>em guerra</span>
+    </div>
+  </div>
+  <span class="demo" id="demo" hidden>demonstração</span>
+</header>
+
+<div class="zoom">
+  <button type="button" id="z-mais" aria-label="Aproximar">+</button>
+  <button type="button" id="z-menos" aria-label="Afastar">−</button>
+  <button type="button" id="z-reset" aria-label="Ver o mundo todo" style="font-size:14px">⌂</button>
+</div>
+
+<aside class="painel" id="painel">
+  <button class="alca" id="alca" type="button" aria-label="Abrir ou fechar painel"><i></i></button>
+  <div class="abas" role="tablist">
+    <button role="tab" aria-selected="true" data-aba="placar" type="button">Países</button>
+    <button role="tab" aria-selected="false" data-aba="guerras" type="button">Guerras</button>
+    <button role="tab" aria-selected="false" data-aba="buscar" type="button">Achar @</button>
+  </div>
+  <div class="corpo" id="corpo"></div>
+</aside>
+
+<script src="https://cdn.jsdelivr.net/npm/d3@7.9.0/dist/d3.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script src="config.js"></script>
+<script>
+(function(){
+  "use strict";
+  var CFG = window.CONFIG || {};
+  var DEMO = /[?&]demo\b/.test(location.search) || !CFG.SUPABASE_URL || !CFG.SUPABASE_ANON_KEY;
+  var GEO_URLS = [
+    "https://cdn.jsdelivr.net/npm/globe.gl/example/datasets/ne_110m_admin_0_countries.geojson",
+    "https://unpkg.com/globe.gl/example/datasets/ne_110m_admin_0_countries.geojson"
+  ];
+  var PATENTES = [
+    {n:"Líder",v:1},{n:"Vice-líder",v:1},{n:"Ministro",v:2},{n:"General",v:3},{n:"Coronel",v:4},{n:"Major",v:6},
+    {n:"Capitão",v:8},{n:"Tenente",v:12},{n:"Sargento",v:16},{n:"Cabo",v:24},{n:"Soldado",v:32},{n:"Pracinha",v:Infinity}
+  ];
+  var nomesPt = new Intl.DisplayNames(["pt-BR"],{type:"region"});
+  var $ = function(id){return document.getElementById(id);};
+  function el(t,c,x){var e=document.createElement(t); if(c) e.className=c; if(x!=null) e.textContent=x; return e;}
+  function fmt(n){return Number(n).toLocaleString("pt-BR");}
+  function sn(s){return String(s||"").normalize("NFD").replace(/[̀-ͯ]/g,"").toLowerCase().trim();}
+  function esc(s){ return String(s).replace(/[&<>"']/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c];}); }
+
+  var paises = {};   // ISO2 -> {cod, feature, maior, xy}
+  var membros = [], guerras = [];
+  var sel = null, aba = "placar", sb = null;
+  var svg, gz, gPaises, gArcos, gLabels, proj, pathGen, zoomB, k = 1, feats = [];
+
+  function codigo(p){
+    var fix = {France:"FR",Norway:"NO"};
+    var c = p.ISO_A2 && p.ISO_A2 !== "-99" ? p.ISO_A2 : (p.ISO_A2_EH && p.ISO_A2_EH !== "-99" ? p.ISO_A2_EH : fix[p.ADMIN||p.NAME]);
+    return c && c !== "-99" ? c : null;
+  }
+  function nomePais(cod){ try{ var n = nomesPt.of(cod); return n && n !== cod ? n : cod; }catch(e){ return cod; } }
+  function matiz(cod){ var h=0; for(var i=0;i<cod.length;i++) h=(h*31+cod.charCodeAt(i))*7%360; return (h*47)%360; }
+  function cor(cod){ return "hsl("+matiz(cod)+" 62% 62%)"; }
+
+  // ---------- regras (as mesmas do bot) ----------
+  function ranquear(lista){
+    var o=lista.slice().sort(function(a,b){return b.xp-a.xp||a.entrou-b.entrou;}), i=0, res=[];
+    PATENTES.forEach(function(p,pi){
+      var n=p.v===Infinity?o.length-i:Math.min(p.v,o.length-i);
+      for(var j=0;j<n;j++){ var m=o[i+j]; res.push({usuario:m.usuario,pais:m.pais,xp:m.xp,pat:pi,pos:i+j+1}); }
+      i+=n;
+    });
+    return res;
+  }
+  function estat(){
+    var por={};
+    membros.forEach(function(m){ var s=por[m.pais]||(por[m.pais]={cod:m.pais,n:0,xp:0}); s.n++; s.xp+=m.xp; });
+    return por;
+  }
+  function liderDe(cod){
+    var l=membros.filter(function(m){return m.pais===cod;}).sort(function(a,b){return b.xp-a.xp||a.entrou-b.entrou;});
+    return l[0]||null;
+  }
+  function guerrasAtivas(){ return guerras.filter(function(g){return g.status==="ativa";}); }
+  function emGuerra(cod){ return guerrasAtivas().some(function(g){return g.atacante===cod||g.defensor===cod;}); }
+
+  // ---------- mapa plano ----------
+  function mobile(){ return innerWidth<820; }
+  function areaVisivel(){ return mobile() ? {w:innerWidth,h:innerHeight*0.54} : {w:innerWidth-400,h:innerHeight}; }
+
+  function maiorPoligono(f){
+    var g=f.geometry, polis=g.type==="Polygon"?[g.coordinates]:g.coordinates, m=polis[0];
+    polis.forEach(function(p){ if(p[0].length>m[0].length) m=p; });
+    return {type:"Feature",geometry:{type:"Polygon",coordinates:m}};
+  }
+
+  function montarMapa(){
+    var box=d3.select("#mapa");
+    svg=box.append("svg").attr("role","img");
+    gz=svg.append("g");
+    gPaises=gz.append("g"); gArcos=gz.append("g"); gLabels=gz.append("g");
+    proj=d3.geoNaturalEarth1(); pathGen=d3.geoPath(proj);
+    gPaises.selectAll("path").data(feats).join("path").attr("class","pais")
+      .on("click",function(ev,f){ var c=codigo(f.properties); if(c) escolher(c,true); })
+      .on("mousemove",function(ev,f){ dica(ev,f); })
+      .on("mouseleave",function(){ $("tip").style.display="none"; });
+    zoomB=d3.zoom().scaleExtent([1,14]).on("zoom",function(ev){
+      k=ev.transform.k; gz.attr("transform",ev.transform); ajustarEscalas();
+    });
+    svg.call(zoomB).on("dblclick.zoom",null);
+    ajustar();
+    addEventListener("resize",ajustar);
+  }
+
+  function ajustar(){
+    var W=innerWidth,H=innerHeight, a=areaVisivel(), topo=mobile()?118:96;
+    svg.attr("viewBox","0 0 "+W+" "+H);
+    proj.fitExtent([[8,topo],[a.w-8,Math.max(topo+120,a.h-8)]],{type:"FeatureCollection",features:feats});
+    zoomB.extent([[0,0],[W,H]]).translateExtent([[0,0],[W,H]]);
+    gPaises.selectAll("path").attr("d",pathGen);
+    feats.forEach(function(f){ var c=codigo(f.properties); if(!c) return;
+      var mp=maiorPoligono(f), xy=pathGen.centroid(mp);
+      paises[c]={cod:c,feature:f,maior:mp,xy:xy}; });
+    atualizarMapa();
+  }
+
+  function ajustarEscalas(){
+    gLabels.selectAll("text").style("font-size",(12/k)+"px").style("stroke-width",(3/k)+"px").attr("display",function(d){return (d.rank<12||k>=2.4)?null:"none";});
+    gArcos.selectAll("circle").attr("r",6/k);
+  }
+
+  function atualizarMapa(){
+    if(!svg) return;
+    var st=estat();
+    gPaises.selectAll("path")
+      .attr("fill",function(f){ var c=codigo(f.properties); return c&&st[c]?cor(c):null; })
+      .classed("guerra",function(f){ var c=codigo(f.properties); return !!c&&emGuerra(c); })
+      .classed("sel",function(f){ return codigo(f.properties)===sel; });
+    gPaises.selectAll("path.sel").raise(); gPaises.selectAll("path.guerra").raise();
+
+    var lista=Object.keys(st).map(function(c){return st[c];}).sort(function(a,b){return b.xp-a.xp;})
+      .filter(function(s){return paises[s.cod];}).map(function(s,i){return {cod:s.cod,rank:i,xy:paises[s.cod].xy};});
+    gLabels.selectAll("text").data(lista,function(d){return d.cod;}).join("text").attr("class","rot")
+      .attr("x",function(d){return d.xy[0];}).attr("y",function(d){return d.xy[1]+3;}).text(function(d){return nomePais(d.cod);});
+
+    var arcos=[], pontos=[];
+    guerrasAtivas().forEach(function(g){
+      var a=paises[g.atacante], d=paises[g.defensor]; if(!a||!d) return;
+      var dx=d.xy[0]-a.xy[0], dy=d.xy[1]-a.xy[1], dist=Math.sqrt(dx*dx+dy*dy)||1;
+      var mx=(a.xy[0]+d.xy[0])/2-dy*0.25, my=(a.xy[1]+d.xy[1])/2+dx*0.25-dist*0.1;
+      arcos.push("M"+a.xy[0]+","+a.xy[1]+" Q"+mx+","+my+" "+d.xy[0]+","+d.xy[1]);
+      pontos.push(a.xy,d.xy);
+    });
+    gArcos.selectAll("path").data(arcos).join("path").attr("class","arco").attr("d",function(d){return d;});
+    gArcos.selectAll("circle").data(pontos).join("circle").attr("class","ponto").attr("cx",function(d){return d[0];}).attr("cy",function(d){return d[1];});
+    ajustarEscalas();
+  }
+
+  function dica(ev,f){
+    if(!matchMedia("(pointer:fine)").matches) return;
+    var c=codigo(f.properties), st=estat()[c], l=c&&liderDe(c), t=$("tip");
+    var h="<b>"+esc(c?nomePais(c):(f.properties.ADMIN||""))+"</b>";
+    h += st ? fmt(st.n)+" soldados · "+fmt(st.xp)+" XP<br>Líder: @"+esc(l.usuario) : "Sem líder. Comente o nome para conquistar.";
+    t.innerHTML=h; t.style.display="block";
+    t.style.left=Math.min(ev.clientX+14,innerWidth-230)+"px"; t.style.top=(ev.clientY+14)+"px";
+  }
+
+  function zoomPara(cod){
+    var p=paises[cod]; if(!p) return;
+    var a=areaVisivel(), b=pathGen.bounds(p.maior), dx=b[1][0]-b[0][0], dy=b[1][1]-b[0][1];
+    var x=(b[0][0]+b[1][0])/2, y=(b[0][1]+b[1][1])/2;
+    var kk=Math.max(1.5,Math.min(9,0.6/Math.max(dx/a.w,dy/a.h)));
+    var t=d3.zoomIdentity.translate(a.w/2-kk*x,(mobile()?a.h/2+30:a.h/2)-kk*y).scale(kk);
+    svg.transition().duration(800).call(zoomB.transform,t);
+  }
+
+  // ---------- painel ----------
+  function renderStats(){
+    var st=$("stats"); st.textContent="";
+    var np=Object.keys(estat()).length;
+    [[membros.length,"soldados"],[np,"países em disputa"],[guerrasAtivas().length,"guerras ativas"]].forEach(function(x){
+      var s=el("span"); s.appendChild(el("b",null,fmt(x[0]))); s.appendChild(document.createTextNode(" "+x[1])); st.appendChild(s);
+    });
+  }
+  function renderPainel(){
+    document.querySelectorAll(".abas button").forEach(function(b){ b.setAttribute("aria-selected",String(b.dataset.aba===aba)); });
+    var c=$("corpo"); c.textContent="";
+    if(aba==="placar"){
+      if(sel&&estat()[sel]) detalhe(c);
+      else if(sel){
+        var f=el("button","fechar","← voltar"); f.type="button"; f.addEventListener("click",function(){sel=null; renderPainel(); atualizarMapa();}); c.appendChild(f);
+        c.appendChild(el("h2",null,nomePais(sel)));
+        c.appendChild(el("p","mut","Sem líder ainda. O primeiro a comentar \""+nomePais(sel)+"\" no vídeo assume o comando."));
+      } else placar(c);
+    }
+    else if(aba==="guerras") listaGuerras(c);
+    else busca(c);
+  }
+  function placar(c){
+    c.appendChild(el("p","como","Para entrar, comente no vídeo o nome do seu país. Procure o seu aqui para ver como está."));
+    var cp=el("div","campo"), i=document.createElement("input");
+    i.id="filtro"; i.type="text"; i.placeholder="procurar país (ex.: Brasil)"; i.autocomplete="off"; i.setAttribute("aria-label","Procurar país");
+    cp.appendChild(i); c.appendChild(cp);
+    var box=el("div"); box.style.display="flex"; box.style.flexDirection="column"; box.style.gap="8px"; c.appendChild(box);
+    i.addEventListener("input",function(){ pintarLista(box,i.value); });
+    pintarLista(box,"");
+  }
+  function pintarLista(box,q){
+    box.textContent="";
+    var st=estat(), nq=sn(q), itens;
+    if(nq){
+      itens=Object.keys(paises).filter(function(c){return sn(nomePais(c)).indexOf(nq)>=0;})
+        .sort(function(a,b){return nomePais(a).localeCompare(nomePais(b),"pt-BR");}).slice(0,12).map(function(c){return {cod:c,s:st[c]};});
+    } else {
+      itens=Object.keys(st).map(function(k2){return st[k2];}).sort(function(a,b){return b.xp-a.xp;}).slice(0,60).map(function(s){return {cod:s.cod,s:s};});
+    }
+    if(!itens.length){ box.appendChild(el("p","mut",nq?"Nenhum país com esse nome.":"Ninguém entrou na guerra ainda. O primeiro a comentar o nome de um país vira líder.")); return; }
+    itens.forEach(function(it,i){
+      var b=el("button","item"); b.type="button";
+      var d=el("span","dot"); d.style.background=it.s?cor(it.cod):"#f3efe4"; b.appendChild(d);
+      b.appendChild(el("span","n",(nq?"":(i+1)+"º ")+nomePais(it.cod)+(emGuerra(it.cod)?" · em guerra":"")));
+      b.appendChild(el("span","v",it.s?fmt(it.s.xp)+" XP":"livre"));
+      b.appendChild(el("span","s",it.s?fmt(it.s.n)+" soldados · líder @"+liderDe(it.cod).usuario:"Sem líder. Comente o nome para conquistar."));
+      b.addEventListener("click",function(){escolher(it.cod,true);});
+      box.appendChild(b);
+    });
+  }
+  function detalhe(c){
+    var l=ranquear(membros.filter(function(m){return m.pais===sel;}));
+    var f=el("button","fechar","← voltar"); f.type="button"; f.addEventListener("click",function(){sel=null; renderPainel(); atualizarMapa();}); c.appendChild(f);
+    c.appendChild(el("h2",null,nomePais(sel)));
+    c.appendChild(el("div","mono mut",fmt(l.length)+" soldados · "+fmt(l.reduce(function(s,m){return s+m.xp;},0))+" XP"+(emGuerra(sel)?" · EM GUERRA":"")));
+    var ld=el("div","lider"); ld.appendChild(el("span","mono mut","LÍDER")); ld.appendChild(el("span","q","@"+l[0].usuario)); ld.appendChild(el("span","mono mut",fmt(l[0].xp)+" XP")); c.appendChild(ld);
+    PATENTES.forEach(function(p,pi){
+      if(pi===0) return;
+      var oc=l.filter(function(m){return m.pat===pi;}); if(!oc.length) return;
+      var r=el("div","pat"), t=el("div","p",p.n); t.appendChild(el("small",null,p.v===Infinity?fmt(oc.length)+" na tropa":oc.length+" de "+p.v));
+      r.appendChild(t);
+      var ch=el("div","chips");
+      oc.slice(0,40).forEach(function(m){ ch.appendChild(el("span","chip","@"+m.usuario+" "+fmt(m.xp))); });
+      if(oc.length>40) ch.appendChild(el("span","chip","+"+fmt(oc.length-40)));
+      r.appendChild(ch); c.appendChild(r);
+    });
+  }
+  function listaGuerras(c){
+    var ativas=guerrasAtivas(), enc=guerras.filter(function(g){return g.status==="encerrada";}).sort(function(a,b){return new Date(b.fim)-new Date(a.fim);}).slice(0,10);
+    c.appendChild(el("p","como","O líder de um país declara guerra comentando GUERRA e o nome do inimigo. Vence quem somar mais XP durante a guerra."));
+    if(!ativas.length) c.appendChild(el("p","mono mut","Nenhuma guerra ativa agora."));
+    ativas.forEach(function(g){
+      var b=el("div","guerra-card"), t=el("div","t"); t.appendChild(document.createTextNode(nomePais(g.atacante))); t.appendChild(el("span","x","×")); t.appendChild(document.createTextNode(nomePais(g.defensor)));
+      b.appendChild(t);
+      var tot=Math.max(1,g.pontos_atacante+g.pontos_defensor), br=el("div","barra");
+      var a=document.createElement("i"); a.style.width=(g.pontos_atacante/tot*100)+"%"; a.style.background="#d97706";
+      var d=document.createElement("i"); d.style.width=(g.pontos_defensor/tot*100)+"%"; d.style.background="#d62f23";
+      br.appendChild(a); br.appendChild(d); b.appendChild(br);
+      b.appendChild(el("div","mono mut",fmt(g.pontos_atacante)+" XP × "+fmt(g.pontos_defensor)+" XP · termina "+new Date(g.fim).toLocaleString("pt-BR",{day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"})));
+      b.appendChild(el("div","mono mut","declarada por @"+g.declarada_por));
+      c.appendChild(b);
+    });
+    if(enc.length){
+      c.appendChild(el("h2",null,"Últimas guerras"));
+      enc.forEach(function(g){
+        c.appendChild(el("div","mono","Venceu "+nomePais(g.vencedor)+" · "+nomePais(g.atacante)+" × "+nomePais(g.defensor)+" ("+fmt(g.pontos_atacante)+" × "+fmt(g.pontos_defensor)+")"));
+      });
+    }
+  }
+  function busca(c){
+    var cp=el("div","campo"), i=document.createElement("input");
+    i.id="busca"; i.type="text"; i.placeholder="seu @ do Instagram"; i.autocomplete="off"; i.autocapitalize="off"; i.spellcheck=false; i.setAttribute("aria-label","Seu @ do Instagram");
+    cp.appendChild(i); c.appendChild(cp);
+    var r=el("div"); r.id="res"; r.style.display="flex"; r.style.flexDirection="column"; r.style.gap="6px"; c.appendChild(r);
+    function achar(){
+      var q=i.value.trim().replace(/^@+/,"").toLowerCase(); r.textContent=""; if(!q) return;
+      var m=membros.find(function(x){return x.usuario===q;});
+      if(!m){ r.appendChild(el("p","mut","@"+q+" ainda não está na guerra. Comente o nome de um país no vídeo.")); return; }
+      var l=ranquear(membros.filter(function(x){return x.pais===m.pais;})), eu=l.find(function(x){return x.usuario===q;});
+      r.appendChild(el("h2",null,PATENTES[eu.pat].n+" de "+nomePais(m.pais)));
+      r.appendChild(el("div","mono mut","@"+q+" · "+fmt(eu.xp)+" XP · "+eu.pos+"º posição"));
+      if(eu.pat>0){
+        var ac=l.filter(function(x){return x.pat===eu.pat-1;}), ult=ac[ac.length-1];
+        r.appendChild(el("div","mono","Faltam cerca de "+fmt(Math.max(1,ult.xp-eu.xp+1))+" XP para virar "+PATENTES[eu.pat-1].n));
+      }
+      var b=el("button","btn","Ver meu país no mapa"); b.type="button"; b.style.alignSelf="flex-start"; b.addEventListener("click",function(){ escolher(m.pais,true,true); }); r.appendChild(b);
+    }
+    i.addEventListener("input",achar);
+  }
+
+  function escolher(cod,voar){
+    sel=cod; aba="placar";
+    if(voar) zoomPara(cod);
+    renderPainel(); atualizarMapa();
+    $("painel").classList.remove("baixo");
+  }
+
+  // ---------- dados ----------
+  function norm(m){ return {usuario:String(m.usuario),pais:String(m.pais),xp:Number(m.xp)||0,entrou:new Date(m.entrou||0).getTime()}; }
+  async function carregar(){
+    var a=await sb.from("membros").select("usuario,pais,xp,entrou").limit(5000);
+    var b=await sb.from("guerras").select("*").order("inicio",{ascending:false}).limit(50);
+    if(a.error||b.error) return;
+    membros=a.data.filter(function(m){return paises[m.pais];}).map(norm); guerras=b.data;
+    renderStats(); if(aba!=="buscar"&&!document.activeElement.matches("input")) renderPainel(); atualizarMapa();
+  }
+  var tmr=null; function agendar(){ clearTimeout(tmr); tmr=setTimeout(carregar,800); }
+
+  function demo(){
+    $("demo").hidden=false;
+    var cods=["BR","AR","US","RU","CN","DE","FR","JP","IN","MX","CA","AU","ZA","EG","TR","KR"], agora=Date.now();
+    cods.forEach(function(c,ci){
+      var n=cods.length-ci+3;
+      for(var i=0;i<n;i++) membros.push({usuario:"demo_"+c.toLowerCase()+"_"+(i+1),pais:c,xp:Math.max(0,1000-i*8)+((i*37+ci*11)%90),entrou:agora-(n-i)*60000});
+    });
+    guerras=[
+      {id:1,atacante:"BR",defensor:"AR",declarada_por:"demo_br_1",status:"ativa",inicio:new Date(agora-3600e3).toISOString(),fim:new Date(agora+20*3600e3).toISOString(),pontos_atacante:380,pontos_defensor:290},
+      {id:2,atacante:"US",defensor:"RU",declarada_por:"demo_us_1",status:"ativa",inicio:new Date(agora-7200e3).toISOString(),fim:new Date(agora+14*3600e3).toISOString(),pontos_atacante:210,pontos_defensor:320},
+      {id:3,atacante:"JP",defensor:"CN",declarada_por:"demo_jp_1",status:"encerrada",inicio:new Date(agora-90000e3).toISOString(),fim:new Date(agora-4000e3).toISOString(),pontos_atacante:150,pontos_defensor:90,vencedor:"JP"}
+    ];
+  }
+
+  async function buscarGeo(){
+    for(var i=0;i<GEO_URLS.length;i++){
+      try{ var r=await fetch(GEO_URLS[i]); if(r.ok) return await r.json(); }catch(e){}
+    }
+    return null;
+  }
+
+  async function iniciar(){
+    var gj=await buscarGeo();
+    if(!gj){ $("carregando").textContent="Não consegui carregar o mapa. Atualize a página."; return; }
+    feats=gj.features.filter(function(f){ return (f.properties.ADMIN||f.properties.NAME)!=="Antarctica"; });
+    montarMapa();
+    $("alca").addEventListener("click",function(){ $("painel").classList.toggle("baixo"); });
+    document.querySelectorAll(".abas button").forEach(function(b){ b.addEventListener("click",function(){ aba=b.dataset.aba; renderPainel(); }); });
+    $("z-mais").addEventListener("click",function(){ svg.transition().duration(300).call(zoomB.scaleBy,1.6); });
+    $("z-menos").addEventListener("click",function(){ svg.transition().duration(300).call(zoomB.scaleBy,1/1.6); });
+    $("z-reset").addEventListener("click",function(){ sel=null; renderPainel(); atualizarMapa(); svg.transition().duration(600).call(zoomB.transform,d3.zoomIdentity); });
+    if(DEMO){ demo(); }
+    else{
+      sb=window.supabase.createClient(CFG.SUPABASE_URL,CFG.SUPABASE_ANON_KEY);
+      await carregar();
+      sb.channel("guerra").on("postgres_changes",{event:"*",schema:"public",table:"membros"},agendar)
+        .on("postgres_changes",{event:"*",schema:"public",table:"guerras"},agendar).subscribe();
+      setInterval(carregar,30000);
+    }
+    renderStats(); renderPainel(); atualizarMapa();
+    $("carregando").classList.add("fim");
+  }
+  iniciar();
+})();
+</script>
+</body>
+</html>
